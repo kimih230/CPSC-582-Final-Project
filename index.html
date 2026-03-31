@@ -1,6 +1,381 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitness Training Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--teal:#1D9E75;--coral:#D85A30;--amber:#BA7517;--bg:#fafaf8;--bg2:#ffffff;--border:#e5e5e0;--text:#111;--text2:#555;--text3:#999}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{padding:1.5rem 2.5rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:1.5rem}
+.header-title{font-size:1.1rem;font-weight:600}
+.header-sub{font-size:.8rem;color:var(--text2);font-family:'DM Mono',monospace}
+.nav{display:flex;padding:0 2.5rem;border-bottom:1px solid var(--border);overflow-x:auto}
+.nav-btn{padding:.85rem 1.2rem;font-size:.82rem;font-weight:500;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:'DM Sans',sans-serif}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.active{color:var(--teal);border-bottom-color:var(--teal)}
+.panel{display:none;padding:2rem 2.5rem}
+.panel.active{display:block}
+.panel-title{font-size:1rem;font-weight:600;margin-bottom:.3rem}
+.panel-sub{font-size:.78rem;color:var(--text2);font-family:'DM Mono',monospace;margin-bottom:1rem}
+.chart-wrap{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.5rem}
+.legend{display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:1rem;font-size:13px;color:var(--text2)}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.back-btn{display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:10px;transition:all .15s}
+.back-btn:hover{color:var(--text)}
+.back-btn.visible{display:flex}
+.ex-select{padding:5px 10px;font-size:13px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);margin-bottom:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.month-btns{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.month-btn{padding:4px 12px;font-size:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:'DM Mono',monospace;transition:all .15s}
+.month-btn.active{border-color:var(--teal);background:#1D9E7515;color:var(--teal)}
+.tooltip{position:fixed;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;pointer-events:none;opacity:0;z-index:1000;color:var(--text);line-height:1.6;font-family:'DM Mono',monospace;box-shadow:0 4px 12px rgba(0,0,0,.1);transition:opacity .1s}
+.tooltip.show{opacity:1}
+.axis text{font-family:'DM Mono',monospace;fill:var(--text2);font-size:11px}
+.axis path,.axis line{stroke:var(--border)}
+.grid line{stroke:var(--border);stroke-opacity:.6}
+.grid path{stroke:none}
+</style>
+</head>
 <body>
-<h1>CPSC 582 - Fitness Dashboard</h1>
+<div class="header">
+  <span class="header-title">Fitness Training Dashboard</span>
+  <span class="header-sub">Personal workout tracking · Nov 2025 – Mar 2026</span>
+</div>
+<nav class="nav">
+  <button class="nav-btn active" data-panel="p1">01 Session Duration</button>
+  <button class="nav-btn" data-panel="p2">02 Progressive Overload</button>
+  <button class="nav-btn" data-panel="p3">03 Recovery Metrics</button>
+  <button class="nav-btn" data-panel="p4">04 Sleep vs Difficulty</button>
+  <button class="nav-btn" data-panel="p5">05 Training Heatmap</button>
+</nav>
+
+<div class="panel active" id="p1">
+  <div class="panel-title" id="p1-title">Average session duration per month</div>
+  <div class="panel-sub" id="p1-sub">Click any bar to drill into individual sessions · teal = at or above 1.25 hrs target</div>
+  <button class="back-btn" id="back-btn">← back to monthly overview</button>
+  <div class="chart-wrap"><svg id="chart1"></svg></div>
+  <div class="legend" id="p1-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>avg ≥ 1.25 hrs (on target)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--coral)"></div>avg &lt; 1.25 hrs (below target)</div>
+  </div>
+  <div class="legend" id="p1-legend-drill" style="display:none">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Upper</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--coral)"></div>Lower</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Abs/Arms</div>
+  </div>
+</div>
+
+<div class="panel" id="p2">
+  <div class="panel-title">Progressive overload: weight progression over time</div>
+  <div class="panel-sub">Select an exercise to track weight progression · hover dots for details</div>
+  <select class="ex-select" id="ex-select"></select>
+  <div class="chart-wrap"><svg id="chart2"></svg></div>
+</div>
+
+<div class="panel" id="p3">
+  <div class="panel-title">Monthly recovery metrics: energy, stress &amp; soreness</div>
+  <div class="panel-sub">All metrics normalized 1–3 (Low / Moderate / High) · hover for values</div>
+  <div class="chart-wrap"><svg id="chart3"></svg></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Avg Energy</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--coral)"></div>Avg Stress</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Avg Soreness</div>
+  </div>
+</div>
+
+<div class="panel" id="p4">
+  <div class="panel-title">Average sleep before workouts by difficulty &amp; muscle group</div>
+  <div class="panel-sub">Does sleeping more lead to easier workouts? · hover for exact values</div>
+  <div class="chart-wrap"><svg id="chart4"></svg></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Upper</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--coral)"></div>Lower</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Abs/Arms</div>
+  </div>
+</div>
+
+<div class="panel" id="p5">
+  <div class="panel-title">Training frequency heatmap</div>
+  <div class="panel-sub">Select a month · colored by muscle group · sleep dot = sleep quality · hover for details</div>
+  <div class="month-btns" id="month-btns"></div>
+  <div class="chart-wrap" id="heatmap-wrap"></div>
+  <div class="legend" style="margin-top:1rem">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Upper</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--coral)"></div>Lower</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Abs/Arms</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2ecc71;border-radius:50%"></div>sleep ≥ 8hrs</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3498db;border-radius:50%"></div>sleep 7–8hrs</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#e74c3c;border-radius:50%"></div>sleep &lt; 7hrs</div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const TEAL='#1D9E75',CORAL='#D85A30',AMBER='#BA7517';
+const MG_COLOR={'Upper':TEAL,'Lower':CORAL,'Abs/Arms':AMBER};
+const tip=document.getElementById('tooltip');
+
+function showTip(html,e){tip.innerHTML=html;tip.classList.add('show');moveTip(e);}
+function moveTip(e){tip.style.left=Math.min(e.clientX+14,window.innerWidth-220)+'px';tip.style.top=(e.clientY-10)+'px';}
+function hideTip(){tip.classList.remove('show');}
+
+document.querySelectorAll('.nav-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById(btn.dataset.panel).classList.add('active');
+    btn.classList.add('active');
+  });
+});
+
+Promise.all([
+  d3.csv('data/Exercise_Log_updated.csv'),
+  d3.csv('data/Sleep_Recovery_updated.csv')
+]).then(([exData,slData])=>{
+  const pd=d3.timeParse('%m/%d/%Y');
+  const cutoff=new Date('2026-03-31');
+  exData.forEach(d=>{d.date=pd(d['Date']);d.weight=d['Weight (lbs)']==='BW'?null:+d['Weight (lbs)'];d.duration=+d['Session Duration (Hours)'];});
+  slData.forEach(d=>{d.date=pd(d['Date']);d.sleep=+d['Sleep Duration (Hours)'];});
+  const ex=exData.filter(d=>d.date&&d.date<=cutoff);
+  const sl=slData.filter(d=>d.date&&d.date<=cutoff);
+  buildC1(ex);buildC2(ex);buildC3(sl);buildC4(ex,sl);buildC5(ex,sl);
+}).catch(()=>{
+  document.querySelectorAll('.chart-wrap').forEach(w=>{w.innerHTML='<div style="padding:2rem;color:#aaa;font-family:monospace;font-size:13px">Could not load data. Make sure CSVs are in the data/ folder.</div>';});
+});
+
+function buildC1(ex){
+  const sess=new Map();
+  ex.forEach(d=>{if(!sess.has(d['Date']))sess.set(d['Date'],{date:d.date,duration:d.duration,muscle:d['Muscle Group']});});
+  const mos=[{y:2025,m:10,label:'Nov'},{y:2025,m:11,label:'Dec'},{y:2026,m:0,label:'Jan'},{y:2026,m:1,label:'Feb'},{y:2026,m:2,label:'Mar'}];
+  const monthly=mos.map(mo=>{
+    const s=[...sess.values()].filter(d=>d.date.getFullYear()===mo.y&&d.date.getMonth()===mo.m);
+    return{label:mo.label,avg:d3.mean(s,x=>x.duration),min:d3.min(s,x=>x.duration),max:d3.max(s,x=>x.duration),sessions:s.sort((a,b)=>a.date-b.date)};
+  });
+  const W=860,H=380,M={top:30,right:80,bottom:50,left:60},iW=W-M.left-M.right,iH=H-M.top-M.bottom;
+  const svg=d3.select('#chart1').attr('width',W).attr('height',H);
+  const g=svg.append('g').attr('transform',`translate(${M.left},${M.top})`);
+
+  document.getElementById('back-btn').addEventListener('click',()=>{
+    document.getElementById('back-btn').classList.remove('visible');
+    document.getElementById('p1-title').textContent='Average session duration per month';
+    document.getElementById('p1-sub').textContent='Click any bar to drill into individual sessions · teal = at or above 1.25 hrs target';
+    document.getElementById('p1-legend').style.display='flex';
+    document.getElementById('p1-legend-drill').style.display='none';
+    drawM();
+  });
+
+  function drawM(){
+    g.selectAll('*').remove();
+    const x=d3.scaleBand().domain(monthly.map(d=>d.label)).range([0,iW]).padding(.35);
+    const y=d3.scaleLinear().domain([0,2.4]).range([iH,0]);
+    g.append('g').attr('class','grid').call(d3.axisLeft(y).ticks(5).tickSize(-iW).tickFormat('')).call(a=>a.select('.domain').remove());
+    g.append('line').attr('x1',0).attr('x2',iW).attr('y1',y(1.25)).attr('y2',y(1.25)).attr('stroke','#aaa').attr('stroke-width',1).attr('stroke-dasharray','4 3');
+    g.append('text').attr('x',iW+4).attr('y',y(1.25)+4).attr('fill','#aaa').attr('font-size',9).attr('font-family','DM Mono,monospace').text('target');
+    const bars=g.selectAll('.bar').data(monthly).join('rect').attr('class','bar')
+      .attr('x',d=>x(d.label)).attr('width',x.bandwidth()).attr('y',iH).attr('height',0)
+      .attr('fill',d=>d.avg>=1.25?TEAL:CORAL).attr('opacity',.85).attr('rx',4).style('cursor','pointer');
+    bars.transition().duration(500).delay((_,i)=>i*80).attr('y',d=>y(d.avg)).attr('height',d=>iH-y(d.avg));
+    setTimeout(()=>{
+      monthly.forEach(d=>{
+        const cx=x(d.label)+x.bandwidth()/2;
+        g.append('line').attr('x1',cx).attr('x2',cx).attr('y1',y(d.min)).attr('y2',y(d.max)).attr('stroke','#555').attr('stroke-width',1.5);
+        [d.min,d.max].forEach(v=>g.append('line').attr('x1',cx-6).attr('x2',cx+6).attr('y1',y(v)).attr('y2',y(v)).attr('stroke','#555').attr('stroke-width',1.5));
+        g.append('text').attr('x',cx).attr('y',y(d.max)-10).attr('text-anchor','middle').attr('fill','#222').attr('font-size',12).attr('font-weight',600).attr('font-family','DM Mono,monospace').text(`${d.avg.toFixed(2)} hrs`);
+      });
+    },600);
+    bars.on('mouseover',(e,d)=>showTip(`<b>${d.label}</b><br>avg: ${d.avg.toFixed(2)} hrs<br>min: ${d.min} · max: ${d.max}<br>${d.sessions.length} sessions<br><i style="color:#aaa">click to expand</i>`,e))
+      .on('mousemove',moveTip).on('mouseout',hideTip).on('click',(_,d)=>drillInto(d));
+    g.append('g').attr('transform',`translate(0,${iH})`).call(d3.axisBottom(x).tickSize(0)).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('text').attr('dy','1.4em').style('fill','#333').style('font-size','14px'));
+    g.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(d=>d+' h')).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('line').remove()).call(a=>a.selectAll('text').style('fill','#666').style('font-size','11px'));
+  }
+
+  function drillInto(mo){
+    document.getElementById('back-btn').classList.add('visible');
+    document.getElementById('p1-title').textContent=`${mo.label} — individual sessions (${mo.sessions.length} total)`;
+    document.getElementById('p1-sub').textContent='Each bar = one session · colored by muscle group';
+    document.getElementById('p1-legend').style.display='none';
+    document.getElementById('p1-legend-drill').style.display='flex';
+    g.selectAll('*').remove();
+    const s=mo.sessions,labels=s.map(x=>`${x.date.getMonth()+1}/${x.date.getDate()}`);
+    const x=d3.scaleBand().domain(labels).range([0,iW]).padding(.2);
+    const y=d3.scaleLinear().domain([0,2.4]).range([iH,0]);
+    g.append('g').attr('class','grid').call(d3.axisLeft(y).ticks(5).tickSize(-iW).tickFormat('')).call(a=>a.select('.domain').remove());
+    const avg=d3.mean(s,x=>x.duration);
+    g.append('line').attr('x1',0).attr('x2',iW).attr('y1',y(avg)).attr('y2',y(avg)).attr('stroke','#888').attr('stroke-width',1.5).attr('stroke-dasharray','6 3');
+    g.append('text').attr('x',iW+4).attr('y',y(avg)+4).attr('fill','#888').attr('font-size',9).attr('font-family','DM Mono,monospace').text(`avg ${avg.toFixed(2)}`);
+    const bars=g.selectAll('.bd').data(s).join('rect').attr('class','bd')
+      .attr('x',(_,i)=>x(labels[i])).attr('width',x.bandwidth()).attr('y',iH).attr('height',0)
+      .attr('fill',d=>MG_COLOR[d.muscle]).attr('opacity',.85).attr('rx',3);
+    bars.transition().duration(400).delay((_,i)=>i*25).attr('y',d=>y(d.duration)).attr('height',d=>iH-y(d.duration));
+    bars.on('mouseover',(e,d)=>showTip(`<b>${mo.label} ${d.date.getMonth()+1}/${d.date.getDate()}</b><br>${d.muscle}<br>${d.duration} hrs`,e)).on('mousemove',moveTip).on('mouseout',hideTip);
+    g.append('g').attr('transform',`translate(0,${iH})`).call(d3.axisBottom(x).tickSize(0)).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('text').attr('dy','1.4em').style('fill','#333').style('font-size','10px').attr('transform','rotate(-35)').style('text-anchor','end'));
+    g.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(d=>d+' h')).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('line').remove()).call(a=>a.selectAll('text').style('fill','#666').style('font-size','11px'));
+  }
+  drawM();
+}
+
+function buildC2(ex){
+  const names=[...new Set(ex.filter(d=>d.weight!==null).map(d=>d['Exercise Name']))].sort();
+  const def=['Hexbar Deadlifts','Lat Cable Pulldown','DB Incline Bench Press','Machine Ab Crunches','Seated Leg Curl Machine'];
+  const ord=[...def.filter(e=>names.includes(e)),...names.filter(e=>!def.includes(e))];
+  const sel=document.getElementById('ex-select');
+  ord.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  const W=860,H=380,M={top:30,right:90,bottom:55,left:65},iW=W-M.left-M.right,iH=H-M.top-M.bottom;
+  const svg=d3.select('#chart2').attr('width',W).attr('height',H);
+  const g=svg.append('g').attr('transform',`translate(${M.left},${M.top})`);
+
+  function draw(name){
+    g.selectAll('*').remove();
+    const seen=new Set(),pts=[];
+    ex.forEach(d=>{
+      if(d['Exercise Name']!==name||d.weight===null||seen.has(d['Date']))return;
+      seen.add(d['Date']);pts.push({date:d.date,weight:d.weight,muscle:d['Muscle Group']});
+    });
+    pts.sort((a,b)=>a.date-b.date);
+    if(!pts.length)return;
+    const color=MG_COLOR[pts[0].muscle]||TEAL;
+    const x=d3.scaleTime().domain(d3.extent(pts,d=>d.date)).range([0,iW]);
+    const y=d3.scaleLinear().domain([0,d3.max(pts,d=>d.weight)*1.15]).range([iH,0]);
+    g.append('g').attr('class','grid').call(d3.axisLeft(y).ticks(6).tickSize(-iW).tickFormat('')).call(a=>a.select('.domain').remove());
+    const area=d3.area().x(d=>x(d.date)).y0(iH).y1(d=>y(d.weight)).curve(d3.curveMonotoneX);
+    g.append('path').datum(pts).attr('fill',color).attr('opacity',.1).attr('d',area);
+    const line=d3.line().x(d=>x(d.date)).y(d=>y(d.weight)).curve(d3.curveMonotoneX);
+    const path=g.append('path').datum(pts).attr('fill','none').attr('stroke',color).attr('stroke-width',2.5).attr('d',line);
+    setTimeout(()=>{const tl=path.node().getTotalLength();path.attr('stroke-dasharray',tl).attr('stroke-dashoffset',tl).transition().duration(800).ease(d3.easeLinear).attr('stroke-dashoffset',0);},50);
+    const dots=g.selectAll('.dot').data(pts).join('circle').attr('class','dot').attr('cx',d=>x(d.date)).attr('cy',d=>y(d.weight)).attr('r',0).attr('fill',color).attr('opacity',.9).style('cursor','crosshair');
+    dots.transition().delay(800).duration(200).attr('r',4);
+    const last=pts[pts.length-1],first=pts[0];
+    g.append('text').attr('x',x(last.date)+8).attr('y',y(last.weight)+4).attr('fill','#222').attr('font-size',12).attr('font-weight',600).attr('font-family','DM Mono,monospace').text(`${last.weight} lbs`);
+    g.append('text').attr('x',x(first.date)-8).attr('y',y(first.weight)+4).attr('fill','#222').attr('font-size',12).attr('font-family','DM Mono,monospace').attr('text-anchor','end').text(`${first.weight} lbs`);
+    const pct=(((last.weight-first.weight)/first.weight)*100).toFixed(0);
+    g.append('text').attr('x',iW/2).attr('y',-10).attr('text-anchor','middle').attr('fill','#666').attr('font-size',12).attr('font-family','DM Mono,monospace').text(`+${pct}% increase over period`);
+    dots.on('mouseover',(e,d)=>showTip(`<b>${d3.timeFormat('%b %d')(d.date)}</b><br>weight: ${d.weight} lbs<br>muscle: ${d.muscle}`,e)).on('mousemove',moveTip).on('mouseout',hideTip);
+    g.append('g').attr('transform',`translate(0,${iH})`).call(d3.axisBottom(x).ticks(d3.timeMonth.every(1)).tickFormat(d3.timeFormat('%b'))).call(a=>a.select('.domain').attr('stroke','#ddd')).call(a=>a.selectAll('text').style('fill','#333').style('font-size','12px')).call(a=>a.selectAll('line').attr('stroke','#ddd'));
+    g.append('g').call(d3.axisLeft(y).ticks(6).tickFormat(d=>d+' lbs')).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('line').remove()).call(a=>a.selectAll('text').style('fill','#666').style('font-size','11px'));
+  }
+  sel.addEventListener('change',function(){draw(this.value);});
+  draw(ord[0]);
+}
+
+function buildC3(sl){
+  const eM={'Low Energy':1,'Adequate Energy':2,'High Energy':3};
+  const sM={'Low Stress':1,'Tolerable Stress':2,'High Stress':3};
+  const soM={'Minor':1,'Manageable':1.67,'Moderate':2.33,'Severe':3};
+  const mos=[{y:2025,m:10,label:'Nov'},{y:2025,m:11,label:'Dec'},{y:2026,m:0,label:'Jan'},{y:2026,m:1,label:'Feb'},{y:2026,m:2,label:'Mar'}];
+  const monthly=mos.map(mo=>{
+    const rows=sl.filter(d=>d.date.getFullYear()===mo.y&&d.date.getMonth()===mo.m);
+    return{label:mo.label,energy:d3.mean(rows,d=>eM[d['Energy Level']]??2),stress:d3.mean(rows,d=>sM[d['Stress Level']]??2),soreness:d3.mean(rows,d=>soM[d['Soreness Level']]??2)};
+  });
+  const metrics=[{key:'energy',label:'Avg Energy',color:TEAL},{key:'stress',label:'Avg Stress',color:CORAL},{key:'soreness',label:'Avg Soreness',color:AMBER}];
+  const W=860,H=400,M={top:30,right:40,bottom:65,left:70},iW=W-M.left-M.right,iH=H-M.top-M.bottom;
+  const svg=d3.select('#chart3').attr('width',W).attr('height',H);
+  const g=svg.append('g').attr('transform',`translate(${M.left},${M.top})`);
+  const x0=d3.scaleBand().domain(monthly.map(d=>d.label)).range([0,iW]).padding(.25);
+  const x1=d3.scaleBand().domain(metrics.map(m=>m.key)).range([0,x0.bandwidth()]).padding(.08);
+  const y=d3.scaleLinear().domain([.5,3.6]).range([iH,0]);
+  g.append('g').attr('class','grid').call(d3.axisLeft(y).tickValues([1,1.5,2,2.5,3]).tickSize(-iW).tickFormat('')).call(a=>a.select('.domain').remove());
+  const mgs=g.selectAll('.mg').data(monthly).join('g').attr('class','mg').attr('transform',d=>`translate(${x0(d.label)},0)`);
+  mgs.selectAll('.bar').data(d=>metrics.map(m=>({...m,value:d[m.key],mo:d.label}))).join('rect').attr('class','bar')
+    .attr('x',d=>x1(d.key)).attr('width',x1.bandwidth()).attr('y',iH).attr('height',0)
+    .attr('fill',d=>d.color).attr('opacity',.85).attr('rx',3)
+    .transition().duration(500).delay((_,i)=>i*60).attr('y',d=>y(d.value)).attr('height',d=>iH-y(d.value));
+  setTimeout(()=>{
+    mgs.selectAll('.vl').data(d=>metrics.map(m=>({...m,value:d[m.key]}))).join('text').attr('class','vl')
+      .attr('x',d=>x1(d.key)+x1.bandwidth()/2).attr('y',d=>y(d.value)-6)
+      .attr('text-anchor','middle').attr('fill','#222').attr('font-size',11).attr('font-weight',600).attr('font-family','DM Mono,monospace').text(d=>d.value.toFixed(1));
+  },700);
+  metrics.forEach(m=>{
+    const lg=d3.line().x(d=>x0(d.label)+x1(m.key)+x1.bandwidth()/2).y(d=>y(d[m.key])).curve(d3.curveMonotoneX);
+    g.append('path').datum(monthly).attr('fill','none').attr('stroke',m.color).attr('stroke-width',1.5).attr('stroke-dasharray','5 3').attr('opacity',.6).attr('d',lg);
+    g.selectAll(null).data(monthly).join('circle').attr('cx',d=>x0(d.label)+x1(m.key)+x1.bandwidth()/2).attr('cy',d=>y(d[m.key])).attr('r',3.5).attr('fill',m.color).attr('opacity',.9);
+  });
+  mgs.selectAll('.hr').data(d=>metrics.map(m=>({...m,value:d[m.key],mo:d.label}))).join('rect').attr('class','hr')
+    .attr('x',d=>x1(d.key)).attr('width',x1.bandwidth()).attr('y',0).attr('height',iH).attr('fill','transparent').style('cursor','crosshair')
+    .on('mouseover',(e,d)=>{const lv=d.value<=1.33?'Low':d.value<=2.33?'Moderate':'High';showTip(`<b>${d.mo} — ${d.label}</b><br>value: ${d.value.toFixed(2)}<br>level: ${lv}`,e);}).on('mousemove',moveTip).on('mouseout',hideTip);
+  g.append('g').attr('transform',`translate(0,${iH})`).call(d3.axisBottom(x0).tickSize(0)).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('text').attr('dy','1.4em').style('fill','#333').style('font-size','14px'));
+  g.append('g').call(d3.axisLeft(y).tickValues([1,1.5,2,2.5,3]).tickFormat(d=>({1:'Low',1.5:'',2:'Moderate',2.5:'',3:'High'}[d]??''))).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('line').remove()).call(a=>a.selectAll('text').style('fill','#666').style('font-size','11px'));
+}
+
+function buildC4(ex,sl){
+  const dM={'Somewhat Difficult':1,'Moderately Difficult':2,'Very Difficult':3,'Extremely Difficult':3};
+  const dL={1:'Somewhat Difficult',2:'Moderately Difficult',3:'Very Difficult'};
+  const mgs=['Upper','Lower','Abs/Arms'];
+  const slMap={};sl.forEach(d=>{slMap[d['Date']]=d.sleep;});
+  const agg={};mgs.forEach(mg=>{agg[mg]={1:[],2:[],3:[]};});
+  ex.forEach(d=>{const mg=d['Muscle Group'],diff=dM[d['Perceived Difficulty']],sleep=slMap[d['Date']];if(mg&&diff&&sleep&&agg[mg]&&agg[mg][diff])agg[mg][diff].push(sleep);});
+  const pd=[1,2,3].map(diff=>({diff,label:dL[diff],Upper:d3.mean(agg['Upper'][diff])||0,Lower:d3.mean(agg['Lower'][diff])||0,'Abs/Arms':d3.mean(agg['Abs/Arms'][diff])||0}));
+  const W=860,H=380,M={top:30,right:40,bottom:65,left:70},iW=W-M.left-M.right,iH=H-M.top-M.bottom;
+  const svg=d3.select('#chart4').attr('width',W).attr('height',H);
+  const g=svg.append('g').attr('transform',`translate(${M.left},${M.top})`);
+  const x0=d3.scaleBand().domain(pd.map(d=>d.label)).range([0,iW]).padding(.3);
+  const x1=d3.scaleBand().domain(mgs).range([0,x0.bandwidth()]).padding(.1);
+  const all=pd.flatMap(d=>mgs.map(mg=>d[mg])).filter(v=>v>0);
+  const y=d3.scaleLinear().domain([d3.min(all)-.3,d3.max(all)+.3]).range([iH,0]);
+  g.append('g').attr('class','grid').call(d3.axisLeft(y).ticks(5).tickSize(-iW).tickFormat('')).call(a=>a.select('.domain').remove());
+  const grps=g.selectAll('.dg').data(pd).join('g').attr('class','dg').attr('transform',d=>`translate(${x0(d.label)},0)`);
+  grps.selectAll('.bar').data(d=>mgs.map(mg=>({mg,value:d[mg],dl:d.label}))).join('rect').attr('class','bar')
+    .attr('x',d=>x1(d.mg)).attr('width',x1.bandwidth()).attr('y',iH).attr('height',0)
+    .attr('fill',d=>MG_COLOR[d.mg]).attr('opacity',.85).attr('rx',3)
+    .transition().duration(500).delay((_,i)=>i*80).attr('y',d=>y(d.value)).attr('height',d=>iH-y(d.value));
+  setTimeout(()=>{
+    grps.selectAll('.vl').data(d=>mgs.map(mg=>({mg,value:d[mg]}))).join('text').attr('class','vl')
+      .attr('x',d=>x1(d.mg)+x1.bandwidth()/2).attr('y',d=>y(d.value)-6)
+      .attr('text-anchor','middle').attr('fill','#222').attr('font-size',11).attr('font-weight',600).attr('font-family','DM Mono,monospace').text(d=>d.value.toFixed(2));
+  },700);
+  grps.selectAll('.hr').data(d=>mgs.map(mg=>({mg,value:d[mg],dl:d.label}))).join('rect').attr('class','hr')
+    .attr('x',d=>x1(d.mg)).attr('width',x1.bandwidth()).attr('y',0).attr('height',iH).attr('fill','transparent').style('cursor','crosshair')
+    .on('mouseover',(e,d)=>showTip(`<b>${d.dl}</b><br>${d.mg}<br>avg sleep: ${d.value.toFixed(2)} hrs`,e)).on('mousemove',moveTip).on('mouseout',hideTip);
+  g.append('g').attr('transform',`translate(0,${iH})`).call(d3.axisBottom(x0).tickSize(0)).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('text').attr('dy','1.4em').style('fill','#333').style('font-size','13px'));
+  g.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(d=>d+' hrs')).call(a=>a.select('.domain').remove()).call(a=>a.selectAll('line').remove()).call(a=>a.selectAll('text').style('fill','#666').style('font-size','11px'));
+  g.append('text').attr('transform','rotate(-90)').attr('x',-iH/2).attr('y',-52).attr('text-anchor','middle').attr('fill','#666').attr('font-size',11).attr('font-family','DM Mono,monospace').text('avg sleep duration (hrs)');
+}
+
+function buildC5(ex,sl){
+  const wd={};ex.forEach(d=>{if(!wd[d['Date']])wd[d['Date']]=d['Muscle Group'];});
+  const slL={};sl.forEach(d=>{slL[d['Date']]={sleep:d.sleep,soreness:d['Soreness Level'],energy:d['Energy Level']};});
+  const mos=[{label:'Nov 2025',year:2025,month:10},{label:'Dec 2025',year:2025,month:11},{label:'Jan 2026',year:2026,month:0},{label:'Feb 2026',year:2026,month:1},{label:'Mar 2026',year:2026,month:2}];
+  const br=document.getElementById('month-btns');
+  mos.forEach((m,i)=>{
+    const btn=document.createElement('button');btn.className='month-btn'+(i===0?' active':'');btn.textContent=m.label;
+    btn.addEventListener('click',()=>{document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');drawHM(m);});
+    br.appendChild(btn);
+  });
+
+  function drawHM(mo){
+    const wrap=document.getElementById('heatmap-wrap');wrap.innerHTML='';
+    const{year,month,label}=mo;
+    const fd=new Date(year,month,1).getDay(),dim=new Date(year,month+1,0).getDate();
+    const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const cs=72,cg=6,rows=Math.ceil((fd+dim)/7);
+    const svgW=7*(cs+cg)+40,svgH=rows*(cs+cg)+70;
+    const svg=d3.select(wrap).append('svg').attr('width',svgW).attr('height',svgH);
+    dn.forEach((n,i)=>svg.append('text').attr('x',20+i*(cs+cg)+cs/2).attr('y',20).attr('text-anchor','middle').attr('fill','#888').attr('font-size',11).attr('font-family','DM Mono,monospace').text(n));
+    for(let day=1;day<=dim;day++){
+      const dow=(fd+day-1)%7,wk=Math.floor((fd+day-1)/7);
+      const cx=20+dow*(cs+cg),cy=32+wk*(cs+cg);
+      const dk=`${month+1}/${day}/${year}`,mg=wd[dk],si=slL[dk],isW=!!mg;
+      svg.append('rect').attr('x',cx).attr('y',cy).attr('width',cs).attr('height',cs).attr('rx',8)
+        .attr('fill',isW?MG_COLOR[mg]:'#f5f5f2').attr('opacity',isW?.2:1).attr('stroke',isW?MG_COLOR[mg]:'#e5e5e0').attr('stroke-width',isW?1.5:.5);
+      if(isW)svg.append('rect').attr('x',cx).attr('y',cy).attr('width',cs).attr('height',4).attr('rx',2).attr('fill',MG_COLOR[mg]);
+      svg.append('text').attr('x',cx+cs/2).attr('y',cy+22).attr('text-anchor','middle').attr('fill',isW?MG_COLOR[mg]:'#bbb').attr('font-size',14).attr('font-weight',isW?600:400).attr('font-family','DM Mono,monospace').text(day);
+      if(isW)svg.append('text').attr('x',cx+cs/2).attr('y',cy+40).attr('text-anchor','middle').attr('fill',MG_COLOR[mg]).attr('font-size',10).attr('font-weight',600).attr('font-family','DM Mono,monospace').text(mg);
+      if(si){const sc=si.sleep>=8?'#2ecc71':si.sleep>=7?'#3498db':'#e74c3c';svg.append('circle').attr('cx',cx+cs/2).attr('cy',cy+cs-10).attr('r',4).attr('fill',sc).attr('opacity',.9);}
+      svg.append('rect').attr('x',cx).attr('y',cy).attr('width',cs).attr('height',cs).attr('fill','transparent').style('cursor','crosshair')
+        .on('mouseover',e=>{const lines=[`<b>${label} ${day}</b>`,isW?`trained: ${mg}`:'rest day'];if(si){lines.push(`sleep: ${si.sleep} hrs`);lines.push(`soreness: ${si.soreness}`);lines.push(`energy: ${si.energy}`);}showTip(lines.join('<br>'),e);}).on('mousemove',moveTip).on('mouseout',hideTip);
+    }
+    const wc=Object.keys(wd).filter(ds=>{const p=ds.split('/');return parseInt(p[0])===month+1&&parseInt(p[2])===year;}).length;
+    const stats=document.createElement('div');
+    stats.style.cssText='margin-top:12px;display:flex;gap:24px;font-size:13px;font-family:DM Mono,monospace;color:#888';
+    stats.innerHTML=`<span style="color:#1D9E75;font-weight:600">${wc}</span>&nbsp;workouts &nbsp;·&nbsp; <span>${dim-wc}</span>&nbsp;rest days &nbsp;·&nbsp; <span style="color:#BA7517;font-weight:600">${(wc/dim*100).toFixed(0)}%</span>&nbsp;training frequency`;
+    wrap.appendChild(stats);
+  }
+  drawHM(mos[0]);
+}
+</script>
 </body>
 </html>
