@@ -137,7 +137,7 @@ Promise.all([
   d3.csv('data/Exercise_Log_updated.csv'),
   d3.csv('data/Sleep_Recovery_updated.csv')
 ]).then(([exData,slData])=>{
-  const pd=d3.timeParse('%m/%d/%Y');
+  const pd=s=>{const p=s.split('/');return new Date(parseInt(p[2]),parseInt(p[0])-1,parseInt(p[1]));};
   const cutoff=new Date('2026-03-31');
   exData.forEach(d=>{d.date=pd(d['Date']);d.weight=d['Weight (lbs)']==='BW'?null:+d['Weight (lbs)'];d.duration=+d['Session Duration (Hours)'];});
   slData.forEach(d=>{d.date=pd(d['Date']);d.sleep=+d['Sleep Duration (Hours)'];});
